@@ -18,9 +18,8 @@ RUN bun install
 FROM oven/bun:1 AS build
 WORKDIR /app
 
+# Copy all node_modules from deps (bun hoists to root in monorepo)
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
-COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 
 # Copy source code
 COPY apps/frontend/ ./apps/frontend/
