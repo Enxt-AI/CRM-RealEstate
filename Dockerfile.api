@@ -12,7 +12,7 @@ COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 
 # Install all dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # ---- Stage 2: Build (generate Prisma client) ----
 FROM oven/bun:1 AS build
