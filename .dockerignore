@@ -17,4 +17,4 @@ build
 out
 .DS_Store
 *.pem
-bun.lock
+

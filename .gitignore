@@ -33,6 +33,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# AWS (contains secrets in task definition)
+.aws/
+
 # Misc
 .DS_Store
 *.pem
