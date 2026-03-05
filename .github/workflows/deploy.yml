@@ -1,0 +1,105 @@
+name: Deploy to ECS Fargate
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push API image
+        run: |
+          docker build -f Dockerfile.api -t $ECR_REGISTRY/crm-api:latest -t $ECR_REGISTRY/crm-api:${{ github.sha }} .
+          docker push $ECR_REGISTRY/crm-api:latest
+          docker push $ECR_REGISTRY/crm-api:${{ github.sha }}
+
+      - name: Build & push Frontend image
+        run: |
+          docker build -f Dockerfile.frontend \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            -t $ECR_REGISTRY/crm-frontend:latest \
+            -t $ECR_REGISTRY/crm-frontend:${{ github.sha }} .
+          docker push $ECR_REGISTRY/crm-frontend:latest
+          docker push $ECR_REGISTRY/crm-frontend:${{ github.sha }}
+
+      - name: Check if ECS service exists
+        id: check-service
+        run: |
+          if aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_SERVICE --query 'services[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ ECS service '$ECS_SERVICE' not found. Images pushed to ECR. Create the service manually first."
+          fi
+
+      - name: Update ECS task definition with new images
+        if: steps.check-service.outputs.exists == 'true'
+        id: update-task-def
+        run: |
+          # Get the current task definition
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition crm-dashboard-task-defination \
+            --query 'taskDefinition' \
+            --output json)
+
+          # Update API container image
+          TASK_DEF=$(echo $TASK_DEF | jq \
+            --arg IMAGE "$ECR_REGISTRY/crm-api:${{ github.sha }}" \
+            '.containerDefinitions |= map(if .name == "crm-api" then .image = $IMAGE else . end)')
+
+          # Update Frontend container image
+          TASK_DEF=$(echo $TASK_DEF | jq \
+            --arg IMAGE "$ECR_REGISTRY/crm-frontend:${{ github.sha }}" \
+            '.containerDefinitions |= map(if .name == "crm-frontend" then .image = $IMAGE else . end)')
+
+          # Remove fields that can't be included in register-task-definition
+          TASK_DEF=$(echo $TASK_DEF | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+
+          # Register new task definition
+          NEW_TASK_DEF=$(aws ecs register-task-definition \
+            --cli-input-json "$TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "task-definition-arn=$NEW_TASK_DEF" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        if: steps.check-service.outputs.exists == 'true'
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition ${{ steps.update-task-def.outputs.task-definition-arn }} \
+            --force-new-deployment
+
+      - name: Wait for deployment stability
+        if: steps.check-service.outputs.exists == 'true'
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE
+          echo "Deployment complete!"
