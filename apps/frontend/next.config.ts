@@ -1,9 +1,10 @@
+import { resolve } from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
     output: "standalone",
     turbopack: {
-        root: "../../",
+        root: resolve(__dirname, "../../"),
     },
 };
 
