@@ -75,10 +75,12 @@ export function verifyToken(token: string): JWTPayload | null {
  * Usage:
  * res.cookie('token', jwtToken, cookieOptions);
  */
+const isHttps = process.env.HTTPS_ENABLED === "true";
+
 export const cookieOptions: CookieOptions = {
   httpOnly: true,
-  secure: false, // Set to true when HTTPS is configured
-  sameSite: "lax",
+  secure: isHttps,
+  sameSite: isHttps ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   path: "/",
 };
