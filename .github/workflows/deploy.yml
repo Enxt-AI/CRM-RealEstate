@@ -39,7 +39,7 @@ jobs:
       - name: Build & push Frontend image
         run: |
           docker build -f Dockerfile.frontend \
-            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_API_URL="" \
             -t $ECR_REGISTRY/crm-frontend:latest \
             -t $ECR_REGISTRY/crm-frontend:${{ github.sha }} .
           docker push $ECR_REGISTRY/crm-frontend:latest
