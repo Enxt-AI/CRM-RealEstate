@@ -77,8 +77,8 @@ export function verifyToken(token: string): JWTPayload | null {
  */
 export const cookieOptions: CookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: false, // Set to true when HTTPS is configured
+  sameSite: "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   path: "/",
 };
