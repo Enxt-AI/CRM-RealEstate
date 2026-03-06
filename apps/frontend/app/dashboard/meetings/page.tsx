@@ -73,14 +73,21 @@ export default function MeetingsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [meetingsData, invitesData, usersData] = await Promise.all([
+      const [meetingsData, invitesData] = await Promise.all([
         meetingsApi.list(),
         meetingsApi.getInvites(),
-        auth.listUsers(),
       ]);
       setMeetingsList(meetingsData);
       setInvites(invitesData);
-      setUsers(usersData);
+
+      // Load users separately — this is admin-only and may return 403
+      try {
+        const usersData = await auth.listUsers();
+        setUsers(usersData);
+      } catch {
+        // Non-admin users can't list users — that's fine
+        setUsers([]);
+      }
     } catch (error) {
       console.error("Failed to load data:", error);
       toast.error("Failed to load meetings");
@@ -462,21 +469,19 @@ export default function MeetingsPage() {
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <button
-          className={`px-4 py-2 -mb-px ${
-            activeTab === "calendar"
+          className={`px-4 py-2 -mb-px ${activeTab === "calendar"
               ? "border-b-2 border-blue-600 font-medium text-blue-600"
               : "text-gray-600 hover:text-gray-900"
-          }`}
+            }`}
           onClick={() => setActiveTab("calendar")}
         >
           Calendar
         </button>
         <button
-          className={`px-4 py-2 -mb-px flex items-center gap-2 ${
-            activeTab === "invites"
+          className={`px-4 py-2 -mb-px flex items-center gap-2 ${activeTab === "invites"
               ? "border-b-2 border-blue-600 font-medium text-blue-600"
               : "text-gray-600 hover:text-gray-900"
-          }`}
+            }`}
           onClick={() => setActiveTab("invites")}
         >
           Invitations
@@ -602,14 +607,12 @@ export default function MeetingsPage() {
                   return (
                     <div
                       key={day}
-                      className={`min-h-24 p-1 border ${
-                        isToday ? "bg-blue-50 border-blue-300" : ""
-                      }`}
+                      className={`min-h-24 p-1 border ${isToday ? "bg-blue-50 border-blue-300" : ""
+                        }`}
                     >
                       <div
-                        className={`text-sm font-medium mb-1 ${
-                          isToday ? "text-blue-600" : ""
-                        }`}
+                        className={`text-sm font-medium mb-1 ${isToday ? "text-blue-600" : ""
+                          }`}
                       >
                         {day}
                       </div>
@@ -726,19 +729,19 @@ export default function MeetingsPage() {
                           Organizer: {meeting.organizer.fullName}
                         </div>
                       </div>
-                      
+
                       {(currentUser?.id === meeting.organizerId ||
                         currentUser?.role === "ADMIN" ||
                         currentUser?.role === "MANAGER") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteMeeting(meeting.id)}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          🗑️
-                        </Button>
-                      )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteMeeting(meeting.id)}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                          >
+                            🗑️
+                          </Button>
+                        )}
                     </div>
                   ))}
                 </div>
