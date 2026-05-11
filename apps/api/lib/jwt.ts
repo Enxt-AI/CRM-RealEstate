@@ -77,11 +77,20 @@ export function verifyToken(token: string): JWTPayload | null {
  */
 const isHttps = process.env.HTTPS_ENABLED === "true";
 
-export const cookieOptions: CookieOptions = {
-  httpOnly: true,
-  secure: isHttps,
-  sameSite: isHttps ? "none" : "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-  path: "/",
+export const cookieOptions = (origin?: string): CookieOptions => {
+  const isHttps = process.env.HTTPS_ENABLED === "true";
+  return {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+};
+
+export const getCookieName = (origin?: string): string => {
+  // Use origin to distinguish apps
+  if (origin?.includes("localhost:3002")) return "token_mobile";
+  return "token_web";
 };
 

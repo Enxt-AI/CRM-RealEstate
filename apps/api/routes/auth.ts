@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import prisma from "@db/client";
 import { hashPassword, verifyPassword, generateRandomPassword } from "../lib/password";
-import { signToken, cookieOptions } from "../lib/jwt";
+import { signToken, cookieOptions, getCookieName } from "../lib/jwt";
 import { authenticate, requireAdmin } from "../middleware/auth";
 import {
   setupSchema,
@@ -90,7 +90,8 @@ router.post("/setup", async (req: Request, res: Response) => {
       role: admin.role,
     });
 
-    res.cookie("token", token, cookieOptions);
+    const cookieName = getCookieName(req.headers.origin);
+    res.cookie(cookieName, token, cookieOptions(req.headers.origin));
 
     res.status(201).json({
       message: "Admin account created successfully",
@@ -167,7 +168,8 @@ router.post("/signin", signinLimiter, async (req: Request, res: Response) => {
       role: user.role,
     });
 
-    res.cookie("token", token, cookieOptions);
+    const cookieName = getCookieName(req.headers.origin);
+    res.cookie(cookieName, token, cookieOptions(req.headers.origin));
 
   res.json({
       message: "Signed in successfully",
@@ -186,8 +188,13 @@ router.post("/signin", signinLimiter, async (req: Request, res: Response) => {
 });
 
 // POST /auth/signout - User logout
-router.post("/signout", authenticate, (_req: Request, res: Response) => {
+router.post("/signout", authenticate, (req: Request, res: Response) => {
+  const origin = req.headers.origin;
+  const cookieName = getCookieName(origin);
+  res.clearCookie(cookieName, { path: "/" });
   res.clearCookie("token", { path: "/" });
+  res.clearCookie("token_web", { path: "/" });
+  res.clearCookie("token_mobile", { path: "/" });
   res.json({ message: "Signed out successfully" });
 });
 
@@ -297,7 +304,7 @@ router.post("/users", authenticate, requireAdmin, async (req: Request, res: Resp
       return;
     }
 
-    const { username, fullName, role, password } = validation.data;
+    const { username, fullName, role, password, email, contactNumber, employeeId } = validation.data;
 
     // Check if username exists
     const existingUser = await prisma.user.findUnique({
@@ -313,16 +320,19 @@ router.post("/users", authenticate, requireAdmin, async (req: Request, res: Resp
     const plainPassword = password || generateRandomPassword();
     const passwordHash = await hashPassword(plainPassword);
 
-    // Create user
-    const newUser = await prisma.user.create({
-      data: {
-        username,
-        fullName,
-        role,
-        passwordHash,
-        needsPasswordChange: true, // Force password change on first login
-      },
-      select: {
+     // Create user
+     const newUser = await prisma.user.create({
+       data: {
+         username,
+         fullName,
+         role,
+         passwordHash,
+         email,
+         contactNumber,
+         employeeId,
+         needsPasswordChange: true, // Force password change on first login
+       },
+       select: {
         id: true,
         username: true,
         fullName: true,
@@ -500,6 +510,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       data: {
         googleRefreshToken: tokens.refresh_token,
         googleCalendarSynced: true,
+        googleSheetsSynced: true,
         email: googleEmail || undefined,
       },
     });

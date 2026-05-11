@@ -24,6 +24,8 @@ const ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/png",
   "image/jpeg",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
 /**
@@ -70,6 +72,7 @@ export async function uploadToS3(
   key: string
 ): Promise<{ success: boolean; key?: string; error?: string }> {
   try {
+    console.log("Preparing S3 upload to bucket:", BUCKET_NAME, "key:", key);
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
@@ -83,6 +86,7 @@ export async function uploadToS3(
     });
 
     await s3Client.send(command);
+    console.log("S3 upload command sent successfully");
 
     return { success: true, key };
   } catch (error) {

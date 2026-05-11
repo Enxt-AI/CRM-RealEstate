@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { Button } from "@/components/ui/button";
+import { FileSpreadsheet, FileText, HardDrive, Store, Phone, Home, Building2, Target, Zap, Globe, Users, Link as LinkIcon } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
@@ -16,6 +17,40 @@ const navigation = [
   { name: "Tasks", href: "/dashboard/tasks", icon: CheckCircleIcon },
   { name: "Meetings", href: "/dashboard/meetings", icon: CalendarIcon },
   { name: "Documents", href: "/dashboard/documents", icon: FolderIcon },
+  { 
+    name: "Integration", 
+    icon: IntegrationIcon,
+    children: [
+      { 
+        name: "Google", 
+        icon: Globe,
+        children: [
+          { name: "Google Sheets", href: "/dashboard/integrations/google/sheets", icon: FileSpreadsheet },
+          { name: "Google Forms", href: "/dashboard/integrations/google/forms", icon: FileText },
+          { name: "Google Drive", href: "/dashboard/integrations/google/drive", icon: HardDrive },
+        ]
+      },
+      { 
+        name: "Lead Generation", 
+        icon: Users,
+        children: [
+          { name: "India Mart", href: "/dashboard/integrations/lead-gen/india-mart", icon: Store },
+          { name: "Just Dial", href: "/dashboard/integrations/lead-gen/just-dial", icon: Phone },
+          { name: "99 Acres", href: "/dashboard/integrations/lead-gen/99-acres", icon: Home },
+          { name: "Magicbricks", href: "/dashboard/integrations/lead-gen/magic-bricks", icon: Building2 },
+          { name: "Hubspot", href: "/dashboard/integrations/lead-gen/hubspot", icon: Target },
+          { name: "Excel files", href: "/dashboard/integrations/lead-gen/excel", icon: FileSpreadsheet },
+        ]
+      },
+      { 
+        name: "Third Party Integration", 
+        icon: LinkIcon,
+        children: [
+          { name: "Zapier", href: "/dashboard/integrations/third-party/zapier", icon: Zap },
+        ]
+      },
+    ]
+  },
 ];
 
 const adminNavigation = [
@@ -32,6 +67,7 @@ export default function DashboardLayout({
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -104,27 +140,133 @@ export default function DashboardLayout({
             <span className="text-lg font-semibold text-neutral-900">CRM</span>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
-            {allNavigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+           {/* Navigation */}
+            <nav className="flex-1 space-y-1 p-4">
+              {allNavigation.map((item) => {
+                const isActive = pathname === item.href;
+                const isExpanded = expandedMenus[item.name];
+
+                if (item.children) {
+                  return (
+                    <div key={item.name} className="space-y-1">
+                      <button
+                        onClick={() => setExpandedMenus(prev => ({ ...prev, [item.name]: !prev[item.name] }))}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          pathname.startsWith(item.href || '/dashboard/integrations')
+                            ? "bg-neutral-100 text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon className="h-5 w-5" />
+                          {item.name}
+                        </div>
+                        <svg
+                          className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="ml-8 space-y-1 border-l border-neutral-200 pl-2">
+                          {item.children.map((child) => {
+                            const isChildActive = pathname.startsWith(child.href || "");
+                            if (child.children) {
+                              const isChildExpanded = expandedMenus[child.name];
+                              return (
+                                <div key={child.name} className="space-y-1">
+                                  <button
+                                    onClick={() => setExpandedMenus(prev => ({ ...prev, [child.name]: !prev[child.name] }))}
+                                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                      isChildActive
+                                        ? "bg-neutral-100 text-neutral-900"
+                                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {child.icon && <child.icon className="h-4 w-4" />}
+                                      <span className="flex-1 text-left">{child.name}</span>
+                                    </div>
+                                    <svg
+                                      className={`h-3 w-3 transition-transform ${isChildExpanded ? "rotate-180" : ""}`}
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </button>
+                                  {isChildExpanded && (
+                                    <div className="ml-4 space-y-1 border-l border-neutral-200 pl-2">
+                                      {child.children.map((grandChild) => {
+                                        const isGrandChildActive = pathname === grandChild.href;
+                                        return (
+                                          <Link
+                                            key={grandChild.name}
+                                            href={grandChild.href}
+                                            className={`flex items-center gap-2 block rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                              isGrandChildActive
+                                                ? "bg-neutral-900 text-white"
+                                                : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                                            }`}
+                                            onClick={() => setSidebarOpen(false)}
+                                          >
+                                            {grandChild.icon && <grandChild.icon className="h-3.5 w-3.5" />}
+                                            {grandChild.name}
+                                          </Link>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <Link
+                                key={child.name}
+                                href={child.href || "#"}
+                                className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                  isChildActive
+                                    ? "bg-neutral-900 text-white"
+                                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                }`}
+                                onClick={() => setSidebarOpen(false)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {child.icon && <child.icon className="h-4 w-4" />}
+                                  <span className="flex-1 text-left">{child.name}</span>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-neutral-900 text-white"
+                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                    }`}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </nav>
 
           {/* User section */}
           <div className="border-t border-neutral-200 p-4">
@@ -203,6 +345,14 @@ export default function DashboardLayout({
 }
 
 // Icons
+function IntegrationIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+    </svg>
+  );
+}
+
 function HomeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -283,4 +433,5 @@ function CalendarIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 

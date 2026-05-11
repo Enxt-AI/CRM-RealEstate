@@ -30,7 +30,15 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   };
 
   if (body) {
-    config.body = JSON.stringify(body);
+    if (body instanceof FormData) {
+      config.body = body;
+      // Let browser set the correct content type with boundary for FormData
+      const newHeaders = { ...config.headers as Record<string, string> };
+      delete newHeaders["Content-Type"];
+      config.headers = newHeaders;
+    } else {
+      config.body = JSON.stringify(body);
+    }
   }
 
   try {
@@ -88,7 +96,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 // AUTH TYPES
 // ================================
 
-export type Role = "ADMIN" | "MANAGER" | "EMPLOYEE";
+export type Role = "ADMIN" | "MANAGER" | "TEAM_LEADER" | "TELE_CALLER" | "FIELD_EXECUTIVE";
 
 export type User = {
   id: string;
@@ -96,10 +104,17 @@ export type User = {
   fullName: string;
   role: Role;
   email: string | null;
+  contactNumber: string | null;
+  employeeId: string | null;
   isActive: boolean;
   needsPasswordChange: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  stats?: {
+    totalCalls: number;
+    connectedCalls: number;
+    unconnectedCalls: number;
+  };
 };
 
 // ================================
@@ -527,7 +542,15 @@ export const auth = {
       method: "POST",
     }),
 
-  createUser: (data: { username: string; fullName: string; role: "MANAGER" | "EMPLOYEE"; password?: string }) =>
+  createUser: (data: { 
+    username: string; 
+    fullName: string; 
+    role: "MANAGER" | "TEAM_LEADER" | "TELE_CALLER" | "FIELD_EXECUTIVE"; 
+    email?: string;
+    contactNumber?: string;
+    employeeId?: string;
+    password?: string 
+  }) =>
     request<{ message: string; user: User; temporaryPassword: string }>("/auth/users", {
       method: "POST",
       body: data,
@@ -542,6 +565,9 @@ export const auth = {
     request<{ message: string; user: User }>(`/auth/users/${id}/toggle-active`, {
       method: "PATCH",
     }),
+
+  getGoogleAuthUrl: () =>
+    request<{ authUrl: string }>("/auth/google/connect"),
 };
 
 // ================================
@@ -855,6 +881,12 @@ export const leads = {
   unarchive: (id: string) =>
     request<{ message: string }>(`/leads/${id}/unarchive`, {
       method: "PATCH",
+    }),
+
+  bulkAssign: (leadIds: string[], assignedToId: string) =>
+    request<{ message: string; count: number }>("/leads/bulk-assign", {
+      method: "POST",
+      body: { leadIds, assignedToId },
     }),
 
   // Import APIs
@@ -1323,6 +1355,59 @@ export const googleCalendar = {
   disconnect: () =>
     request<{ message: string }>("/auth/google/disconnect", {
       method: "POST",
+    }),
+};
+
+// ================================
+// INTEGRATIONS API
+// ================================
+
+export const integrations = {
+  getGoogleSheetsStatus: () => 
+    request<{ connected: boolean }>("/integrations/google-sheets/status"),
+  
+  getGoogleSheetsHeaders: (spreadsheetId: string, range: string) => 
+    request<{ headers: string[] }>(`/integrations/google-sheets/headers?spreadsheetId=${spreadsheetId}&range=${encodeURIComponent(range)}`),
+  
+  syncGoogleSheets: (data: {
+    spreadsheetId: string;
+    range: string;
+    campaignId: string;
+    currentStageId: string;
+    mapping: Record<string, string>;
+  }) => 
+    request<{ message: string; imported: number; updated: number; errors: any[] }>( "/integrations/google-sheets/sync", {
+      method: "POST",
+      body: data,
+    }),
+
+  getGoogleFormsQuestions: (formId: string) => 
+    request<{ questions: { id: string; title: string }[] }>(`/integrations/google-forms/questions?formId=${formId}`),
+  
+  syncGoogleForms: (data: {
+    formId: string;
+    campaignId: string;
+    currentStageId: string;
+    mapping: Record<string, string>;
+  }) => 
+    request<{ message: string; imported: number; updated: number; errors: any[] }>( "/integrations/google-forms/sync", {
+      method: "POST",
+      body: data,
+    }),
+
+  getGoogleDriveFolders: () =>
+    request<{ folders: { id: string; name: string }[] }>("/integrations/google-drive/folders"),
+
+  saveGoogleDriveConfig: (folderId: string) =>
+    request<{ message: string; folderId: string }>("/integrations/google-drive/config", {
+      method: "POST",
+      body: { folderId },
+    }),
+
+  uploadExcelLeads: (formData: FormData) =>
+    request<{ message: string; imported: number; updated: number; errors: any[] }>("/integrations/upload-excel", {
+      method: "POST",
+      body: formData,
     }),
 };
 

@@ -48,9 +48,12 @@ export const createUserSchema = z.object({
     .string()
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name must be at most 100 characters"),
-  role: z.enum(["MANAGER", "EMPLOYEE"], {
-    errorMap: () => ({ message: "Role must be either MANAGER or EMPLOYEE" }),
+  role: z.enum(["MANAGER", "TEAM_LEADER", "TELE_CALLER", "FIELD_EXECUTIVE"], {
+    errorMap: () => ({ message: "Role must be either MANAGER, TEAM_LEADER, TELE_CALLER, or FIELD_EXECUTIVE" }),
   }),
+  email: z.string().email("Invalid email address").optional().nullable().or(z.literal("")),
+  contactNumber: z.string().max(20).optional().nullable(),
+  employeeId: z.string().max(50).optional().nullable(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")

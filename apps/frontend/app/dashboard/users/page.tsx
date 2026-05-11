@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CreateUserDialog } from "@/components/create-user-dialog";
+import { UserStatsDialog } from "@/components/user-stats-dialog";
 
 export default function UsersPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (currentUser && currentUser.role !== "ADMIN") {
@@ -95,175 +97,150 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="bg-white min-h-[calc(100vh-4rem)] p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">User Management</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Manage team members and their access levels
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowCreateDialog(true)}
-          className="bg-neutral-900 hover:bg-neutral-800"
-        >
-          <svg
-            className="mr-2 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => router.back()} className="p-1.5 hover:bg-neutral-100 rounded-full text-neutral-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m15 18-6-6 6-6"/>
           </svg>
-          Add User
+        </button>
+        <h1 className="text-xl font-semibold text-neutral-800">User Report</h1>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="text-brand-600 border-brand-200 bg-brand-50/50 hover:bg-brand-50 h-9 px-4 rounded-md font-medium text-sm">
+            Last 30 Days ✕
+          </Button>
+          <Button variant="outline" className="text-neutral-600 border-neutral-200 hover:bg-neutral-50 h-9 px-4 rounded-md font-medium text-sm gap-2">
+            Role 
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </Button>
+          <Button variant="outline" className="text-neutral-600 border-neutral-200 hover:bg-neutral-50 h-9 px-4 rounded-md font-medium text-sm gap-2">
+            User
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </Button>
+          <Button 
+            onClick={() => setShowCreateDialog(true)}
+            variant="outline" 
+            className="text-neutral-600 border-neutral-200 hover:bg-neutral-50 h-9 px-4 rounded-md font-medium text-sm gap-2"
+          >
+            + Add User
+          </Button>
+        </div>
+        
+        <Button variant="outline" size="icon" className="h-9 w-9 border-neutral-200 text-neutral-500 hover:text-neutral-700 rounded-md">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+          </svg>
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-neutral-500">Total Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-neutral-900">{users.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-neutral-500">Active Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-neutral-900">
-              {users.filter((u) => u.isActive).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-neutral-500">Admins</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-neutral-900">
-              {users.filter((u) => u.role === "ADMIN").length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Users table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">All Users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {users.length === 0 ? (
-            <div className="py-12 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-neutral-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-                />
-              </svg>
-              <h3 className="mt-4 text-sm font-medium text-neutral-900">No users yet</h3>
-              <p className="mt-1 text-sm text-neutral-500">
-                Get started by adding your first team member
-              </p>
-              <Button
-                className="mt-4 bg-neutral-900 hover:bg-neutral-800"
-                onClick={() => setShowCreateDialog(true)}
-              >
-                Add User
-              </Button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+      <div className="border border-neutral-100 rounded-lg overflow-hidden bg-white">
+        {users.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="text-sm text-neutral-500">No users found.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-neutral-50/50">
+                <TableRow className="hover:bg-transparent border-neutral-100">
+                  <TableHead className="w-16 font-medium text-neutral-400">No.</TableHead>
+                  <TableHead className="font-medium text-neutral-400">User Name</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Role</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Status</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Total Calls</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Connected</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Unconnected</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Last Login</TableHead>
+                  <TableHead className="font-medium text-neutral-400">Created</TableHead>
+                  <TableHead className="text-right font-medium text-neutral-400">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user, index) => (
+                  <TableRow 
+                    key={user.id} 
+                    className="cursor-pointer hover:bg-neutral-50 transition-colors border-neutral-100"
+                    onClick={() => setSelectedUser(user)}
+                  >
+                    <TableCell className="text-sm text-neutral-500">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm font-medium text-neutral-700">{user.fullName}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getRoleBadgeVariant(user.role)} className="font-normal text-xs">
+                        {user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            user.isActive ? "bg-green-500" : "bg-neutral-300"
+                          }`}
+                        />
+                        <span className="text-sm text-neutral-600">
+                          {user.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-600">
+                      {user.stats?.totalCalls || 0}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-600">
+                      {user.stats?.connectedCalls || 0}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-600">
+                      {user.stats?.unconnectedCalls || 0}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {formatDate(user.lastLoginAt)}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {formatDate(user.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      {user.id !== currentUser?.id && user.role !== "ADMIN" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(user.id)}
+                          className="text-neutral-500 hover:text-neutral-800 text-xs h-8"
+                        >
+                          {user.isActive ? "Deactivate" : "Activate"}
+                        </Button>
+                      )}
+                      {user.id === currentUser?.id && (
+                        <span className="text-xs text-neutral-400">You</span>
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-sm font-medium text-neutral-700">
-                            {user.fullName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-neutral-900">{user.fullName}</p>
-                            <p className="text-sm text-neutral-500">@{user.username}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`h-2 w-2 rounded-full ${
-                              user.isActive ? "bg-green-500" : "bg-neutral-300"
-                            }`}
-                          />
-                          <span className="text-sm text-neutral-600">
-                            {user.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
-                        {formatDate(user.lastLoginAt)}
-                      </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
-                        {formatDate(user.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {user.id !== currentUser?.id && user.role !== "ADMIN" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleActive(user.id)}
-                            className="text-neutral-600 hover:text-neutral-900"
-                          >
-                            {user.isActive ? "Deactivate" : "Activate"}
-                          </Button>
-                        )}
-                        {user.id === currentUser?.id && (
-                          <span className="text-xs text-neutral-400">You</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       {/* Create user dialog */}
       <CreateUserDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onUserCreated={fetchUsers}
+      />
+
+      {/* User Stats Dialog */}
+      <UserStatsDialog 
+        user={selectedUser}
+        open={!!selectedUser}
+        onOpenChange={(open) => !open && setSelectedUser(null)}
       />
     </div>
   );

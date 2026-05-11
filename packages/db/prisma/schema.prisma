@@ -13,28 +13,31 @@ model User {
   username             String            @unique
   passwordHash         String
   fullName             String
-  email                String?           @unique
-  role                 Role              @default(EMPLOYEE)
+  role                 Role              @default(TELE_CALLER)
+  contactNumber         String?
+  employeeId            String?
   isActive             Boolean           @default(true)
   needsPasswordChange  Boolean           @default(true)
   lastLoginAt          DateTime?
-  googleRefreshToken   String?
-  googleCalendarId     String?
-  googleCalendarSynced Boolean           @default(false)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
-  createdPipelines     Pipeline[]        @relation("PipelineCreator")
+  email                String?           @unique
+  googleCalendarId     String?
+  googleCalendarSynced Boolean           @default(false)
+  googleSheetsSynced    Boolean           @default(false)
+  googleRefreshToken   String?
   createdCampaigns     Campaign[]        @relation("CampaignCreator")
-  assignedCampaigns    Campaign[]        @relation("AssignedCampaigns")
-  assignedLeads        Lead[]            @relation("LeadOwner")
-  createdInteractions  Interaction[]     @relation("InteractionCreator")
-  listedProperties     Property[]        @relation("PropertyListedBy")
   createdFolders       Folder[]          @relation("FolderCreator")
+  createdInteractions  Interaction[]     @relation("InteractionCreator")
+  assignedLeads        Lead[]            @relation("LeadOwner")
   uploadedDocuments    ManagedDocument[] @relation("DocumentUploader")
   meetings             Meeting[]         @relation("MeetingOrganizer")
   meetingAttendees     MeetingAttendee[] @relation("MeetingAttendee")
   notes                Note[]            @relation("NoteAuthor")
+  createdPipelines     Pipeline[]        @relation("PipelineCreator")
+  listedProperties     Property[]        @relation("PropertyListedBy")
   tasks                Task[]            @relation("TaskAssignee")
+  assignedCampaigns    Campaign[]        @relation("AssignedCampaigns")
   sharedDocuments      ManagedDocument[] @relation("SharedDocuments")
   sharedFolders        Folder[]          @relation("SharedFolders")
 
@@ -45,17 +48,17 @@ model User {
 }
 
 model Pipeline {
-  id          String       @id @default(uuid())
+  id          String          @id @default(uuid())
   name        String
   description String?
-  type        PipelineType @default(BUYER)
-  isActive    Boolean      @default(true)
+  type        PipelineType    @default(BUYER)
+  isActive    Boolean         @default(true)
   createdById String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  createdBy   User         @relation("PipelineCreator", fields: [createdById], references: [id])
-  stages      PipelineStage[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   campaigns   Campaign[]
+  createdBy   User            @relation("PipelineCreator", fields: [createdById], references: [id])
+  stages      PipelineStage[]
 
   @@index([type, isActive])
   @@index([createdById])
@@ -69,37 +72,37 @@ model PipelineStage {
   order       Int
   color       String   @default("#3B82F6")
   isDefault   Boolean  @default(false)
-  isFinal     Boolean  @default(false) // Marks Closed Won/Lost stages
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  isFinal     Boolean  @default(false)
   leads       Lead[]
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 
   @@unique([pipelineId, order])
   @@index([pipelineId, order])
 }
 
 model Campaign {
-  id                String             @id @default(uuid())
-  name              String
-  description       String?
-  pipelineId        String
-  status            CampaignStatus     @default(ACTIVE)
-  startDate         DateTime
-  endDate           DateTime?
-  budget            Decimal?           @db.Decimal(12, 2)
-  actualSpend       Decimal?           @db.Decimal(12, 2)
-  source            String?
-  sourceDetails     String?
-  assignedToIds     String[]
-  createdById       String
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  pipeline          Pipeline           @relation(fields: [pipelineId], references: [id])
-  createdBy         User               @relation("CampaignCreator", fields: [createdById], references: [id])
-  assignedTo        User[]             @relation("AssignedCampaigns")
-  leads             Lead[]
+  id                 String             @id @default(uuid())
+  name               String
+  description        String?
+  pipelineId         String
+  status             CampaignStatus     @default(ACTIVE)
+  startDate          DateTime
+  endDate            DateTime?
+  budget             Decimal?           @db.Decimal(12, 2)
+  actualSpend        Decimal?           @db.Decimal(12, 2)
+  source             String?
+  sourceDetails      String?
+  assignedToIds      String[]
+  createdById        String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdBy          User               @relation("CampaignCreator", fields: [createdById], references: [id])
+  pipeline           Pipeline           @relation(fields: [pipelineId], references: [id])
   campaignProperties CampaignProperty[]
+  leads              Lead[]
+  assignedTo         User[]             @relation("AssignedCampaigns")
 
   @@index([pipelineId, status])
   @@index([status, startDate])
@@ -108,46 +111,46 @@ model Campaign {
 
 model Lead {
   id                     String             @id @default(uuid())
-  firstName              String
-  lastName               String
   email                  String?
   mobile                 String?
-  alternatePhone         String?
-  leadType               LeadType           @default(BUYER)
-  propertyTypePreference PropertyType[]
-  budgetMin              Decimal?           @db.Decimal(12, 2)
-  budgetMax              Decimal?           @db.Decimal(12, 2)
-  locationPreference     String[]
-  bedroomsMin            Int?
-  bathroomsMin           Decimal?           @db.Decimal(3, 1)
-  squareFeetMin          Int?
-  moveInTimeline         MoveInTimeline?
-  currentHousingStatus   HousingStatus?
-  preApprovalStatus      PreApprovalStatus?
-  preApprovalAmount      Decimal?           @db.Decimal(12, 2)
-  campaignId             String
-  currentStageId         String
   score                  Int                @default(0)
   priority               Priority           @default(MEDIUM)
   tags                   String[]
-  assignedToId           String
-  isArchived             Boolean            @default(false)
-  archivedAt             DateTime?
-  archivedReason         String?
-  initialNotes           String?
   lastContactedAt        DateTime?
   nextFollowUpAt         DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
+  initialNotes           String?
+  archivedAt             DateTime?
+  isArchived             Boolean            @default(false)
+  alternatePhone         String?
+  archivedReason         String?
+  assignedToId           String
+  bathroomsMin           Decimal?           @db.Decimal(3, 1)
+  bedroomsMin            Int?
+  budgetMax              Decimal?           @db.Decimal(12, 2)
+  budgetMin              Decimal?           @db.Decimal(12, 2)
+  campaignId             String
+  currentHousingStatus   HousingStatus?
+  currentStageId         String
+  firstName              String
+  lastName               String
+  leadType               LeadType           @default(BUYER)
+  locationPreference     String[]
+  moveInTimeline         MoveInTimeline?
+  preApprovalAmount      Decimal?           @db.Decimal(12, 2)
+  preApprovalStatus      PreApprovalStatus?
+  propertyTypePreference PropertyType[]
+  squareFeetMin          Int?
+  documents              Document[]
+  interactions           Interaction[]
+  assignedTo             User               @relation("LeadOwner", fields: [assignedToId], references: [id])
   campaign               Campaign           @relation(fields: [campaignId], references: [id])
   currentStage           PipelineStage      @relation(fields: [currentStageId], references: [id])
-  assignedTo             User               @relation("LeadOwner", fields: [assignedToId], references: [id])
-  interactions           Interaction[]
-  properties             PropertyInterest[]
-  tasks                  Task[]
   meetings               Meeting[]
   notes                  Note[]
-  documents              Document[]
+  properties             PropertyInterest[]
+  tasks                  Task[]
 
   @@index([campaignId, currentStageId])
   @@index([assignedToId, isArchived])
@@ -157,6 +160,7 @@ model Lead {
   @@index([nextFollowUpAt])
   @@index([score, priority])
 }
+
 model Property {
   id                 String             @id @default(uuid())
   address            String
@@ -173,7 +177,7 @@ model Property {
   lotSize            Decimal?           @db.Decimal(10, 2)
   yearBuilt          Int?
   mlsNumber          String?            @unique
-  description        String?            @db.Text
+  description        String?
   photos             String[]
   virtualTourUrl     String?
   hoaFees            Decimal?           @db.Decimal(10, 2)
@@ -185,9 +189,9 @@ model Property {
   soldPrice          Decimal?           @db.Decimal(12, 2)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+  campaignProperties CampaignProperty[]
   listedBy           User?              @relation("PropertyListedBy", fields: [listedById], references: [id])
   interests          PropertyInterest[]
-  campaignProperties CampaignProperty[]
 
   @@index([listingStatus, propertyType])
   @@index([city, state, zipCode])
@@ -237,7 +241,7 @@ model Interaction {
   leadId       String
   type         InteractionType
   subject      String?
-  content      String?         @db.Text
+  content      String?
   direction    Direction       @default(OUTBOUND)
   duration     Int?
   recordingUrl String?
@@ -249,8 +253,8 @@ model Interaction {
   occurredAt   DateTime        @default(now())
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-  lead         Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
   createdBy    User            @relation("InteractionCreator", fields: [createdById], references: [id])
+  lead         Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId, occurredAt])
   @@index([type, occurredAt])
@@ -268,13 +272,13 @@ model Meeting {
   status        MeetingStatus     @default(SCHEDULED)
   organizerId   String
   leadId        String?
-  googleEventId String?
   reminderSent  Boolean           @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
-  attendees     MeetingAttendee[]
+  googleEventId String?
   lead          Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
   organizer     User              @relation("MeetingOrganizer", fields: [organizerId], references: [id])
+  attendees     MeetingAttendee[]
 
   @@index([organizerId, startTime])
   @@index([startTime, status])
@@ -282,16 +286,16 @@ model Meeting {
 }
 
 model MeetingAttendee {
-  id              String                @id @default(uuid())
-  meetingId       String
-  userId          String
-  status          MeetingAttendeeStatus @default(PENDING)
-  googleEventId   String?
-  respondedAt     DateTime?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  meeting         Meeting               @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  user            User                  @relation("MeetingAttendee", fields: [userId], references: [id])
+  id            String                @id @default(uuid())
+  meetingId     String
+  userId        String
+  status        MeetingAttendeeStatus @default(PENDING)
+  googleEventId String?
+  respondedAt   DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  meeting       Meeting               @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user          User                  @relation("MeetingAttendee", fields: [userId], references: [id])
 
   @@unique([meetingId, userId])
   @@index([userId, status])
@@ -392,7 +396,9 @@ model ManagedDocument {
 enum Role {
   ADMIN
   MANAGER
-  EMPLOYEE
+  TEAM_LEADER
+  TELE_CALLER
+  FIELD_EXECUTIVE
 }
 
 enum Priority {

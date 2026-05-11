@@ -12,6 +12,7 @@ import documentsRouter from "./routes/documents";
 import usersRouter from "./routes/users";
 import tasksRouter from "./routes/tasks";
 import meetingsRouter from "./routes/meetings";
+import integrationsRouter from "./routes/integrations";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/documents", documentsRouter);
 app.use("/users", usersRouter);
 app.use("/tasks", tasksRouter);
 app.use("/meetings", meetingsRouter);
+app.use("/integrations", integrationsRouter);
 
 // Health check
 app.get("/health", (_req, res) => {

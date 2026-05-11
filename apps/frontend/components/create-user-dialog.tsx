@@ -39,7 +39,10 @@ export function CreateUserDialog({
   const [formData, setFormData] = useState({
     fullName: "",
     username: "",
-    role: "" as "MANAGER" | "EMPLOYEE" | "",
+    email: "",
+    contactNumber: "",
+    employeeId: "",
+    role: "" as "MANAGER" | "TEAM_LEADER" | "TELE_CALLER" | "FIELD_EXECUTIVE" | "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,7 +53,7 @@ export function CreateUserDialog({
     setErrors((prev) => ({ ...prev, [name]: "" }));
   }
 
-  function handleRoleChange(value: "MANAGER" | "EMPLOYEE") {
+  function handleRoleChange(value: "MANAGER" | "TEAM_LEADER" | "TELE_CALLER" | "FIELD_EXECUTIVE") {
     setFormData((prev) => ({ ...prev, role: value }));
     setErrors((prev) => ({ ...prev, role: "" }));
   }
@@ -103,7 +106,10 @@ export function CreateUserDialog({
       const response = await auth.createUser({
         fullName: formData.fullName,
         username: formData.username,
-        role: formData.role as "MANAGER" | "EMPLOYEE",
+        email: formData.email || null,
+        contactNumber: formData.contactNumber || null,
+        employeeId: formData.employeeId || null,
+        role: formData.role as "MANAGER" | "TEAM_LEADER" | "TELE_CALLER" | "FIELD_EXECUTIVE",
         password: passwordMode === "manual" ? formData.password : undefined,
       });
 
@@ -140,6 +146,9 @@ export function CreateUserDialog({
     setFormData({
       fullName: "",
       username: "",
+      email: "",
+      contactNumber: "",
+      employeeId: "",
       role: "",
       password: "",
     });
@@ -170,13 +179,25 @@ export function CreateUserDialog({
           <div className="space-y-4">
             <div className="rounded-lg bg-neutral-50 p-4">
               <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Username</p>
-                  <p className="font-mono text-sm text-neutral-900">{formData.username}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Temporary Password</p>
-                  <div className="flex items-center gap-2">
+                 <div>
+                   <p className="text-xs font-medium text-neutral-500">Username</p>
+                   <p className="font-mono text-sm text-neutral-900">{formData.username}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs font-medium text-neutral-500">Email</p>
+                   <p className="text-sm text-neutral-900">{formData.email || "N/A"}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs font-medium text-neutral-500">Contact Number</p>
+                   <p className="text-sm text-neutral-900">{formData.contactNumber || "N/A"}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs font-medium text-neutral-500">Employee ID</p>
+                   <p className="text-sm text-neutral-900">{formData.employeeId || "N/A"}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs font-medium text-neutral-500">Temporary Password</p>
+                   <div className="flex items-center gap-2">
                     <p className="font-mono text-sm text-neutral-900">{createdPassword}</p>
                     <Button
                       type="button"
@@ -270,24 +291,81 @@ export function CreateUserDialog({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-sm font-medium text-neutral-700">
-              Username
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              placeholder="johndoe"
-              value={formData.username}
-              onChange={handleChange}
-              className={errors.username ? "border-red-500 focus-visible:ring-red-500" : ""}
-              disabled={isSubmitting}
-            />
-            {errors.username && (
-              <p className="text-xs text-red-500">{errors.username}</p>
-            )}
-          </div>
+           <div className="space-y-2">
+             <Label htmlFor="username" className="text-sm font-medium text-neutral-700">
+               Username
+             </Label>
+             <Input
+               id="username"
+               name="username"
+               type="text"
+               placeholder="johndoe"
+               value={formData.username}
+               onChange={handleChange}
+               className={errors.username ? "border-red-500 focus-visible:ring-red-500" : ""}
+               disabled={isSubmitting}
+             />
+             {errors.username && (
+               <p className="text-xs text-red-500">{errors.username}</p>
+             )}
+           </div>
+
+           <div className="space-y-2">
+             <Label htmlFor="email" className="text-sm font-medium text-neutral-700">
+               Email
+             </Label>
+             <Input
+               id="email"
+               name="email"
+               type="email"
+               placeholder="john@example.com"
+               value={formData.email}
+               onChange={handleChange}
+               className={errors.email ? "border-red-500 focus-visible:ring-red-500" : ""}
+               disabled={isSubmitting}
+             />
+             {errors.email && (
+               <p className="text-xs text-red-500">{errors.email}</p>
+             )}
+           </div>
+
+           <div className="space-y-2">
+             <Label htmlFor="contactNumber" className="text-sm font-medium text-neutral-700">
+               Contact Number
+             </Label>
+             <Input
+               id="contactNumber"
+               name="contactNumber"
+               type="text"
+               placeholder="+1 234 567 890"
+               value={formData.contactNumber}
+               onChange={handleChange}
+               className={errors.contactNumber ? "border-red-500 focus-visible:ring-red-500" : ""}
+               disabled={isSubmitting}
+             />
+             {errors.contactNumber && (
+               <p className="text-xs text-red-500">{errors.contactNumber}</p>
+             )}
+           </div>
+
+           <div className="space-y-2">
+             <Label htmlFor="employeeId" className="text-sm font-medium text-neutral-700">
+               Employee ID
+             </Label>
+             <Input
+               id="employeeId"
+               name="employeeId"
+               type="text"
+               placeholder="EMP-123"
+               value={formData.employeeId}
+               onChange={handleChange}
+               className={errors.employeeId ? "border-red-500 focus-visible:ring-red-500" : ""}
+               disabled={isSubmitting}
+             />
+             {errors.employeeId && (
+               <p className="text-xs text-red-500">{errors.employeeId}</p>
+             )}
+           </div>
 
           <div className="space-y-2">
             <Label htmlFor="role" className="text-sm font-medium text-neutral-700">
@@ -301,10 +379,12 @@ export function CreateUserDialog({
               <SelectTrigger className={errors.role ? "border-red-500 focus:ring-red-500" : ""}>
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MANAGER">Manager</SelectItem>
-                <SelectItem value="EMPLOYEE">Employee</SelectItem>
-              </SelectContent>
+               <SelectContent>
+                 <SelectItem value="MANAGER">Manager</SelectItem>
+                 <SelectItem value="TEAM_LEADER">Team Leader</SelectItem>
+                 <SelectItem value="TELE_CALLER">Tele Callers</SelectItem>
+                 <SelectItem value="FIELD_EXECUTIVE">Field Executive</SelectItem>
+               </SelectContent>
             </Select>
             {errors.role && (
               <p className="text-xs text-red-500">{errors.role}</p>

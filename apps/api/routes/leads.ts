@@ -53,9 +53,11 @@ router.get("/", authenticate, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
+    console.log("Fetching leads for user:", userId, "with role:", userRole);
     const { campaignId, stageId, assignedToId, leadType, isArchived } = req.query;
 
     const where: any = {};
+    const employeeRoles = ["EMPLOYEE", "TELE_CALLER", "FIELD_EXECUTIVE", "TEAM_LEADER"];
 
     // Only filter by isArchived if explicitly provided
     if (isArchived !== undefined) {
@@ -64,18 +66,28 @@ router.get("/", authenticate, async (req, res) => {
 
     // Campaign filter
     if (campaignId) {
+      console.log("Campaign ID provided:", campaignId);
       const hasAccess = await canAccessCampaign(campaignId as string, userId, userRole);
       if (!hasAccess) {
         return res.status(403).json({ error: "Access denied to this campaign" });
       }
       where.campaignId = campaignId;
-    } else if (userRole === "EMPLOYEE") {
-      // Employees only see leads from their assigned campaigns
+    } else if (employeeRoles.includes(userRole)) {
+      console.log("Entering employee campaign filter. User role is:", userRole);
+      // Employees see leads from their assigned campaigns OR leads directly assigned to them
       const assignedCampaigns = await prisma.campaign.findMany({
         where: { assignedToIds: { has: userId } },
         select: { id: true },
       });
-      where.campaignId = { in: assignedCampaigns.map((c: { id: string }) => c.id) };
+      const assignedIds = assignedCampaigns.map((c: { id: string }) => c.id);
+      console.log("Assigned campaigns:", assignedIds);
+      
+      where.OR = [
+        { campaignId: { in: assignedIds } },
+        { assignedToId: userId }
+      ];
+    } else {
+      console.log("Applying NO filtering. User role:", userRole);
     }
 
     if (stageId) {
@@ -84,8 +96,11 @@ router.get("/", authenticate, async (req, res) => {
 
     if (assignedToId) {
       where.assignedToId = assignedToId;
-    } else if (userRole === "EMPLOYEE") {
-      // By default, employees see only their assigned leads
+    } else if (employeeRoles.includes(userRole)) {
+      console.log("Filtering by assigned lead to user:", userId);
+      // Employees must see leads assigned to them. 
+      // If we are already filtering by assigned campaigns above, 
+      // adding assignedToId here acts as an additional restrictor.
       where.assignedToId = userId;
     }
 
@@ -137,6 +152,9 @@ router.get("/", authenticate, async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
+    console.log("Query 'where' clause:", JSON.stringify(where, null, 2));
+    console.log("Leads returned:", leads.length);
+
     res.json(leads);
   } catch (error) {
     console.error("Error fetching leads:", error);
@@ -155,12 +173,17 @@ router.get("/stats", authenticate, async (req, res) => {
 
     if (campaignId) {
       where.campaignId = campaignId;
-    } else if (userRole === "EMPLOYEE") {
+    } else if (["EMPLOYEE", "TELE_CALLER", "FIELD_EXECUTIVE", "TEAM_LEADER"].includes(userRole)) {
       const assignedCampaigns = await prisma.campaign.findMany({
         where: { assignedToIds: { has: userId } },
         select: { id: true },
       });
-      where.campaignId = { in: assignedCampaigns.map((c: { id: string }) => c.id) };
+      const assignedIds = assignedCampaigns.map((c: { id: string }) => c.id);
+      
+      where.OR = [
+        { campaignId: { in: assignedIds } },
+        { assignedToId: userId }
+      ];
     }
 
     const [total, byType, byStage, followUps] = await Promise.all([
@@ -578,6 +601,79 @@ router.put("/:id", authenticate, async (req, res) => {
       return res.status(404).json({ error: "Lead not found" });
     }
     res.status(500).json({ error: "Failed to update lead" });
+  }
+});
+
+// Update lead stage
+router.patch("/:id/stage", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentStageId } = req.body;
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+
+    if (!currentStageId) {
+      return res.status(400).json({ error: "currentStageId is required" });
+    }
+
+    // Get existing lead
+    const existingLead = await prisma.lead.findUnique({
+      where: { id },
+      include: { campaign: true, currentStage: true },
+    });
+
+    if (!existingLead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Check access
+    const hasAccess = await canAccessCampaign(existingLead.campaignId, userId, userRole);
+    if (!hasAccess && existingLead.assignedToId !== userId) {
+      return res.status(403).json({ error: "Access denied to this lead" });
+    }
+
+    if (existingLead.currentStageId === currentStageId) {
+      return res.json(existingLead); // No change needed
+    }
+
+    // Verify stage exists and belongs to campaign's pipeline
+    const stage = await prisma.pipelineStage.findUnique({
+      where: { id: currentStageId },
+      include: { pipeline: { include: { campaigns: true } } },
+    });
+
+    if (!stage) {
+      return res.status(404).json({ error: "Pipeline stage not found" });
+    }
+
+    // Update lead and log interaction
+    const [lead] = await prisma.$transaction([
+      prisma.lead.update({
+        where: { id },
+        data: { currentStageId },
+        include: {
+          campaign: { select: { id: true, name: true } },
+          currentStage: { select: { id: true, name: true, color: true } },
+          assignedTo: { select: { id: true, fullName: true } },
+        },
+      }),
+      prisma.interaction.create({
+        data: {
+          leadId: id,
+          type: "STAGE_CHANGE",
+          subject: "Stage Changed",
+          content: `Stage changed from ${existingLead.currentStage?.name || 'Unknown'} to ${stage.name}`,
+          direction: "OUTBOUND",
+          createdById: userId,
+          occurredAt: new Date(),
+        },
+      })
+    ]);
+
+    res.json(lead);
+  } catch (error: any) {
+    console.error("Error updating lead stage:", error);
+    res.status(500).json({ error: "Failed to update lead stage" });
   }
 });
 
@@ -1197,6 +1293,52 @@ router.post("/import/bulk", authenticate, upload.single("file"), async (req, res
       error: "Failed to import leads", 
       details: error.message 
     });
+  }
+});
+
+// Bulk assign leads to a user
+router.post("/bulk-assign", authenticate, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { leadIds, assignedToId } = req.body;
+
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({ error: "leadIds array is required" });
+    }
+
+    if (!assignedToId) {
+      return res.status(400).json({ error: "assignedToId is required" });
+    }
+
+    // Only ADMIN and MANAGER can bulk assign
+    if (userRole !== "ADMIN" && userRole !== "MANAGER" && userRole !== "TEAM_LEADER") {
+      return res.status(403).json({ error: "You do not have permission to bulk assign leads" });
+    }
+
+    // Verify target user exists
+    const targetUser = await prisma.user.findUnique({
+      where: { id: assignedToId },
+      select: { id: true, fullName: true, isActive: true },
+    });
+
+    if (!targetUser || !targetUser.isActive) {
+      return res.status(404).json({ error: "Target user not found or inactive" });
+    }
+
+    // Update all leads
+    const result = await prisma.lead.updateMany({
+      where: { id: { in: leadIds } },
+      data: { assignedToId },
+    });
+
+    res.json({
+      message: `${result.count} lead(s) assigned to ${targetUser.fullName}`,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error("Error bulk assigning leads:", error);
+    res.status(500).json({ error: "Failed to bulk assign leads" });
   }
 });
 

@@ -30,7 +30,35 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
       orderBy: [{ role: "asc" }, { fullName: "asc" }],
     });
 
-    res.json({ users, total: users.length });
+    // Fetch call statistics for each user
+    const usersWithStats = await Promise.all(
+      users.map(async (user) => {
+        const calls = await prisma.interaction.findMany({
+          where: {
+            createdById: user.id,
+            type: "CALL",
+          },
+          select: {
+            subject: true,
+          },
+        });
+
+        const totalCalls = calls.length;
+        const connectedCalls = calls.filter(c => c.subject?.includes("Connected") && !c.subject?.includes("Not Connected") && !c.subject?.includes("Unconnected")).length;
+        const unconnectedCalls = totalCalls - connectedCalls;
+
+        return {
+          ...user,
+          stats: {
+            totalCalls,
+            connectedCalls,
+            unconnectedCalls,
+          },
+        };
+      })
+    );
+
+    res.json({ users: usersWithStats, total: usersWithStats.length });
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: "Failed to fetch users" });

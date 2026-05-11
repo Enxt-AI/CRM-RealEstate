@@ -21,10 +21,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { AddLeadDialog } from "@/components/add-lead-dialog";
 import { ImportLeadsDialog } from "@/components/import-leads-dialog";
 import { EditLeadDialog } from "@/components/edit-lead-dialog";
-import { leads as leadsApi, campaigns as campaignsApi, type Lead, type Campaign, type LeadType, type Priority } from "@/lib/api";
+import { leads as leadsApi, campaigns as campaignsApi, auth, type Lead, type Campaign, type LeadType, type Priority, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
@@ -55,6 +64,13 @@ export default function LeadsPage() {
   const [filterCampaign, setFilterCampaign] = useState<string>(campaignIdFromUrl || "all");
   const [filterLeadType, setFilterLeadType] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+
+  // Bulk assign state
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
+  const [bulkAssignUserId, setBulkAssignUserId] = useState<string>("");
+  const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -133,6 +149,64 @@ export default function LeadsPage() {
     acc[lead.leadType] = (acc[lead.leadType] || 0) + 1;
     return acc;
   }, {} as Record<LeadType, number>);
+
+  // Bulk selection helpers
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) {
+        next.delete(leadId);
+      } else {
+        next.add(leadId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeadIds.size === filteredLeads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(filteredLeads.map((l) => l.id)));
+    }
+  };
+
+  const isAllSelected = filteredLeads.length > 0 && selectedLeadIds.size === filteredLeads.length;
+  const isSomeSelected = selectedLeadIds.size > 0 && selectedLeadIds.size < filteredLeads.length;
+
+  const handleOpenBulkAssign = async () => {
+    try {
+      const users = await auth.listUsers();
+      setTeamMembers(users.filter((u) => u.isActive));
+    } catch (error) {
+      toast.error("Failed to load team members");
+      return;
+    }
+    setShowBulkAssignDialog(true);
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkAssignUserId) {
+      toast.error("Please select a team member");
+      return;
+    }
+
+    setBulkAssigning(true);
+    try {
+      const result = await leadsApi.bulkAssign(Array.from(selectedLeadIds), bulkAssignUserId);
+      toast.success(result.message);
+      setSelectedLeadIds(new Set());
+      setShowBulkAssignDialog(false);
+      setBulkAssignUserId("");
+      fetchLeads();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to assign leads");
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
+  const canBulkAssign = user?.role === "ADMIN" || user?.role === "MANAGER" || user?.role === "TEAM_LEADER";
 
   return (
     <div className="space-y-6">
@@ -304,6 +378,34 @@ export default function LeadsPage() {
         </CardContent>
       </Card>
 
+      {/* Bulk Action Bar */}
+      {selectedLeadIds.size > 0 && canBulkAssign && (
+        <div className="flex items-center gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
+          <span className="text-sm font-medium text-blue-800">
+            {selectedLeadIds.size} lead{selectedLeadIds.size > 1 ? "s" : ""} selected
+          </span>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-blue-300 text-blue-700 hover:bg-blue-100"
+            onClick={() => setSelectedLeadIds(new Set())}
+          >
+            Clear Selection
+          </Button>
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={handleOpenBulkAssign}
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+            Assign to Team Member
+          </Button>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -360,6 +462,19 @@ export default function LeadsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canBulkAssign && (
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                          checked={isAllSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = isSomeSelected;
+                          }}
+                          onChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Contact</TableHead>
@@ -374,7 +489,20 @@ export default function LeadsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id}>
+                    <TableRow
+                      key={lead.id}
+                      className={selectedLeadIds.has(lead.id) ? "bg-blue-50/50" : ""}
+                    >
+                      {canBulkAssign && (
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                            checked={selectedLeadIds.has(lead.id)}
+                            onChange={() => toggleLeadSelection(lead.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">
                         <div>
                           <div>{lead.firstName} {lead.lastName}</div>
@@ -462,6 +590,53 @@ export default function LeadsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Bulk Assign Dialog */}
+      <Dialog open={showBulkAssignDialog} onOpenChange={setShowBulkAssignDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Assign Leads</DialogTitle>
+            <DialogDescription>
+              Assign {selectedLeadIds.size} selected lead{selectedLeadIds.size > 1 ? "s" : ""} to a team member.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Assign to</Label>
+              <Select onValueChange={setBulkAssignUserId} value={bulkAssignUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.fullName} ({member.role.replace("_", " ")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkAssignDialog(false);
+                setBulkAssignUserId("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkAssign}
+              disabled={bulkAssigning || !bulkAssignUserId}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {bulkAssigning ? "Assigning..." : `Assign ${selectedLeadIds.size} Lead${selectedLeadIds.size > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

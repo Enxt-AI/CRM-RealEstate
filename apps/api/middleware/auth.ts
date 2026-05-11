@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { Role } from "@prisma/client";
-import { verifyToken, type JWTPayload } from "../lib/jwt";
+import { verifyToken, getCookieName, type JWTPayload } from "../lib/jwt";
 
 // Extend Express Request type to include user
 declare global {
@@ -15,34 +15,12 @@ declare global {
  * Authentication Middleware
  * 
  * Verifies JWT token from HTTP-only cookie and attaches user data to request
- * 
- * Flow:
- * 1. Extracts token from 'token' cookie
- * 2. Verifies JWT signature and expiration
- * 3. Attaches decoded payload to req.user
- * 4. Allows request to proceed to next middleware
- * 
- * User Payload Structure:
- * - userId: User's UUID
- * - username: User's username
- * - role: User's role (ADMIN, MANAGER, or EMPLOYEE)
- * - fullName: User's display name
- * 
- * Security Features:
- * - HTTP-only cookies prevent XSS attacks
- * - JWT expiration prevents token reuse
- * - Secure cookie flag in production (HTTPS only)
- * 
- * Error Responses:
- * - 401: No token provided or invalid/expired token
- * 
- * Usage:
- * router.get('/protected', authenticate, (req, res) => {
- *   const userId = req.user.userId; // User is authenticated
- * });
  */
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const token = req.cookies?.token;
+  // Check for distinct cookies based on origin
+  const origin = req.headers.origin || req.headers.referer;
+  const cookieName = getCookieName(origin);
+  const token = req.cookies?.[cookieName] || req.cookies?.token;
 
   if (!token) {
     res.status(401).json({ error: "Authentication required" });

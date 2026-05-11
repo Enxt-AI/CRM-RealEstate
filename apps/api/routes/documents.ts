@@ -307,8 +307,10 @@ router.post(
 
       // Generate S3 key and upload
       const s3Key = generateS3Key(req.file.originalname);
+      console.log("Attempting S3 upload with key:", s3Key, "MIME type:", req.file.mimetype);
       
       const uploadResult = await uploadToS3(req.file, s3Key);
+      console.log("Upload result:", uploadResult);
 
       if (!uploadResult.success) {
         console.error("S3 upload failed:", uploadResult.error);
